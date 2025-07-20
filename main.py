@@ -1,45 +1,27 @@
 import os
 import sys
 import shutil
-import logging
 
 import yt_dlp
-import ffmpeg
 from sentence_transformers import SentenceTransformer, util
 
+from logger import MyLogger
+from structures import UserPrompts
 from effects import EditorEffects
-from structures import TrimEffect, TextOverlayEffect, FillOverlayEffect, TextPosition
 
-VIDEO_TITLE = "Lost"
-AUTHOR = "Obito"
+my_prompt = UserPrompts(
+    title="Lost",
+    author="Obito",
+    language="vi",
+)
 
 sys.stderr = open("error.log", "w")
 
-
-# Configure logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setFormatter(
-    logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
-)
-file_handler = logging.FileHandler("output.log", mode="w")
-file_handler.setFormatter(
-    logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
-)
-
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
-
+logger = MyLogger("main").get_logger()
 logger.info("Loading SentenceTransformer model...")
 model = SentenceTransformer("all-MiniLM-L6-v2")
 embedding1 = model.encode(
-    f"The original video music video called {VIDEO_TITLE} by {AUTHOR}."
+    f"The original video music video called {my_prompt.title} by {my_prompt.author}."
 )
 logger.info("Model loaded successfully.")
 
@@ -61,44 +43,18 @@ download_opts = {
     "outtmpl": "downloads/%(title)s.%(ext)s",
     "geo_bypass": True,
     "logger": logger,
+    "subtitleslangs": [my_prompt.language],
+    "subtitlesformat": "srt",
+    "writesubtitles": True,
     # "verbose": True,
 }
 
 
-def effects_vid(filename: str, metadata=None):
-    edited_filename = os.path.splitext(filename)[0] + "_edited.mp4"
-    shutil.copy(filename, edited_filename)
-    editor = EditorEffects(edited_filename, logger=logger)
-
-    start_time = 30
-    duration = 20
-
-    trim = TrimEffect(start_time=start_time, end_time=start_time + duration)
-    fill_overlay = FillOverlayEffect(color="black", opacity=0.4)
-    text_overlay = TextOverlayEffect(
-        text=f"{VIDEO_TITLE} by {AUTHOR}",
-        position=TextPosition(
-            vertical="center",
-            horizontal="center",
-        ),
-        font_size=40,
-        color="white",
-        duration=duration,
-    )
-
-    try:
-        editor.apply_effects([trim, fill_overlay, text_overlay])
-        logger.info(f"Applied all effects to {filename}")
-    except ffmpeg.Error as e:
-        logger.error(f"Error applying effects: {e}")
-        logger.error(e.stdout.decode("utf-8") if e.stdout else "No ffmpeg stdout")
-        logger.error(e.stderr.decode("utf-8") if e.stderr else "No ffmpeg stderr")
-        raise
-
-
 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
     logger.info("Searching for videos...")
-    results = ydl.extract_info(f"ytsearch5:{VIDEO_TITLE} {AUTHOR}", download=False)
+    results = ydl.extract_info(
+        f"ytsearch5:{my_prompt.title} {my_prompt.author}", download=False
+    )
     logger.info("Search completed.")
 
     max_entry = None
@@ -144,9 +100,24 @@ with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             if not metadata:
                 logger.error("Failed to extract metadata from the downloaded video.")
                 exit(1)
+            # Get subtitles
             file_name = download_ydl.prepare_filename(metadata)
+            base_name = os.path.splitext(file_name)[0]
+            subtitle_file = f"{base_name}.{my_prompt.language}.srt"
+
             logger.info(f"Downloaded to {file_name}")
-            effects_vid(file_name, metadata=metadata)
+
+            edited_filename = os.path.splitext(file_name)[0] + "_edited.mp4"
+            shutil.copy(file_name, edited_filename)
+
+            editor = EditorEffects(
+                file_path=edited_filename,
+                subtitle_path=subtitle_file,
+                logger=logger,
+                metadata=metadata,
+            )
+            editor.effects_vid(user_prompts=my_prompt)
+            editor.add_subtitles()
 
     else:
         logger.warning("No suitable video found.")

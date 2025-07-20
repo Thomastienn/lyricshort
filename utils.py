@@ -3,7 +3,7 @@ from PIL import ImageFont
 import ffmpeg
 
 
-class Utils:
+class StreamUtils:
     """
     Utility class for common operations related to video files.
     """
