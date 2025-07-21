@@ -35,7 +35,23 @@ class Effect(BaseModel, ABC):
     """
 
     @abstractmethod
-    def apply(self, file_path: str): ...
+    def apply(self, file_path: str):
+        """
+        Apply the effect to the video file.
+        :param file_path: Path to the input video file
+        """
+        ...
+
+    @abstractmethod
+    def video_node(
+        self, input_stream: ffmpeg.nodes.FilterableStream, *args, **kwargs
+    ) -> ffmpeg.nodes.FilterableStream:
+        """
+        Apply the effect to the video filter node.
+        :param input_stream: Input stream from ffmpeg
+        :return: Filtered video node
+        """
+        ...
 
 
 class BlurEffect(Effect):
@@ -45,13 +61,18 @@ class BlurEffect(Effect):
 
     radius: float = 5.0  # Default radius for the blur effect
 
+    def video_node(
+        self, input_stream_video: ffmpeg.nodes.FilterableStream, *args, **kwargs
+    ):
+        return input_stream_video.filter("gblur", sigma=self.radius)  # type: ignore[reportAttributeAccessIssue]
+
     def apply(self, file_path: str):
         """
         Apply the blur effect to the video file.
         :param file_path: Path to the input video file
         """
         input_stream = ffmpeg.input(file_path)
-        video_node = input_stream.video.filter("gblur", sigma=self.radius)
+        video_node = self.video_node(input_stream.video)
         audio_node = input_stream.audio
 
         audio_codec = StreamUtils.get_audio_codec(file_path)
@@ -94,6 +115,11 @@ class TextOverlayProperties(BaseModel):
     start_time: float | None = None  # Start time in seconds for the text overlay
     duration: int = 3  # Duration in seconds for which the text is displayed
 
+    offset: tuple[int, int] = (
+        0,
+        0,
+    )  # Offset for the text overlay (move right, move down) in pixels
+
 
 class TextOverlayEffect(Effect):
     """
@@ -102,18 +128,13 @@ class TextOverlayEffect(Effect):
 
     texts: list[TextOverlayProperties]
 
-    def apply(self, file_path: str):
-        """
-        Apply the text overlay effect to the video file.
-        :param file_path: Path to the input video file
-        """
-        audio_codec = StreamUtils.get_audio_codec(file_path)
-        acodec = "copy" if audio_codec == "aac" else "aac"
-
-        input_stream = ffmpeg.input(file_path)
-        video_node = input_stream.video
-        audio_node = input_stream.audio
-
+    def video_node(
+        self, input_stream_video: ffmpeg.nodes.FilterableStream, *args, **kwargs
+    ):
+        file_path = args[0] if args else kwargs.get("file_path", None)
+        if not file_path:
+            raise ValueError("File path must be provided for video node processing.")
+        video_node = input_stream_video
         for text_props in self.texts:
             if text_props.start_time is None:
                 start_time = StreamUtils.get_start_time(file_path) or 0
@@ -144,7 +165,10 @@ class TextOverlayEffect(Effect):
                 x = text_props.position[0]
                 y = text_props.position[1]
 
-            video_node = video_node.filter(
+            x += text_props.offset[0]  # Move right
+            y += text_props.offset[1]  # Move down
+
+            video_node = video_node.filter(  # type: ignore[reportAttributeAccessIssue]
                 "drawtext",
                 text=text_props.text,
                 x=x,
@@ -155,6 +179,20 @@ class TextOverlayEffect(Effect):
                 boxcolor=text_props.background_color,
                 enable=f"between(t,{start_time},{start_time + text_props.duration})",
             )
+
+        return video_node
+
+    def apply(self, file_path: str):
+        """
+        Apply the text overlay effect to the video file.
+        :param file_path: Path to the input video file
+        """
+        audio_codec = StreamUtils.get_audio_codec(file_path)
+        acodec = "copy" if audio_codec == "aac" else "aac"
+
+        input_stream = ffmpeg.input(file_path)
+        video_node = self.video_node(input_stream.video, file_path)
+        audio_node = input_stream.audio
 
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
             # Use ffmpeg to add text overlay
@@ -186,6 +224,12 @@ class TrimEffect(Effect):
     start_time: float  # Start time in seconds
     end_time: float  # End time in seconds
 
+    def video_node(
+        self, input_stream_video: ffmpeg.nodes.FilterableStream, *args, **kwargs
+    ):
+        return input_stream_video
+
+    # Trim effect only apply alone
     def apply(self, file_path: str):
         """
         Apply the trim effect to the video file.
@@ -218,18 +262,14 @@ class FillOverlayEffect(Effect):
     color: str  # Color for the fill overlay
     opacity: float = 0.5  # Opacity of the fill overlay
 
-    def apply(self, file_path: str):
-        """
-        Apply the fill overlay effect to the video file.
-        :param file_path: Path to the input video file
-        """
+    def video_node(
+        self, input_stream_video: ffmpeg.nodes.FilterableStream, *args, **kwargs
+    ):
+        file_path = args[0] if args else kwargs.get("file_path", None)
+        if not file_path:
+            raise ValueError("File path must be provided for video node processing.")
         width, height = StreamUtils.get_video_dimensions(file_path)
-
-        # Streams
-        input_stream = ffmpeg.input(file_path)
-        video_node = input_stream.video
-        audio_node = input_stream.audio
-
+        video_node = input_stream_video
         overlay_node = (
             ffmpeg.input(
                 f"color={self.color}:s={width}x{height}:d=0.1",
@@ -239,9 +279,21 @@ class FillOverlayEffect(Effect):
             .filter("colorchannelmixer", aa=self.opacity)
         )
 
-        video_filter = video_node.filter("format", "rgba").overlay(
+        video_filter = video_node.filter("format", "rgba").overlay(  # type: ignore[reportAttributeAccessIssue]
             overlay_node, x=0, y=0, eof_action="repeat"
         )
+        return video_filter
+
+    def apply(self, file_path: str):
+        """
+        Apply the fill overlay effect to the video file.
+        :param file_path: Path to the input video file
+        """
+
+        # Streams
+        input_stream = ffmpeg.input(file_path)
+        video_node = self.video_node(input_stream.video, file_path)
+        audio_node = input_stream.audio
 
         audio_codec = StreamUtils.get_audio_codec(file_path)
         acodec = "copy" if audio_codec == "aac" else "aac"
@@ -249,7 +301,7 @@ class FillOverlayEffect(Effect):
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
             (
                 ffmpeg.output(
-                    video_filter,
+                    video_node,
                     audio_node,
                     temp_file.name,
                     vcodec="libx264",

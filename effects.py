@@ -1,10 +1,12 @@
 import os
 import logging
+import tempfile
 from typing import Sequence
 
 import ffmpeg
 import srt
 
+from utils import StreamUtils
 from structures import (
     Effect,
     TrimEffect,
@@ -14,7 +16,6 @@ from structures import (
     TextPosition,
     UserPrompts,
 )
-from utils import StreamUtils
 
 
 class EditorEffects:
@@ -28,14 +29,14 @@ class EditorEffects:
         self.start_time = 25
         self.duration = 20
 
-    def apply_effects(self, effects: Sequence[Effect]):
+    def apply_effects_individual(self, effects: Sequence[Effect]):
         """
-        Apply a list of effects to the video.
-        :param effects: List of Effect instances
+        Apply a single effect to the video.
+        :param effect: Effect instance
         """
         for effect in effects:
-            self.logger.info(f"Applying effect: {effect.__class__.__name__}")
             try:
+                logging.info(f"Applying effect: {effect.__class__.__name__}")
                 effect.apply(self.file_path)
             except ffmpeg.Error as e:
                 self.logger.error(
@@ -51,6 +52,86 @@ class EditorEffects:
             self.logger.info(
                 f"Effect {effect.__class__.__name__} applied successfully."
             )
+
+    def apply_effects(self, effects: Sequence[Effect]):
+        """
+        Apply a list of effects to the video.
+        :param effects: List of Effect instances
+        """
+        # self.apply_effects_individual(effects)
+        # return
+        cnt = 0
+        trim_idx = len(effects)
+        for i, effect in enumerate(effects):
+            cnt += isinstance(effect, TrimEffect)
+            if isinstance(effect, TrimEffect):
+                trim_idx = i
+
+        if cnt > 1:
+            self.apply_effects_individual(effects)
+            return
+
+        def apply_without_trim(local_effects):
+            if not local_effects:
+                return
+            self.logger.info(
+                f"Applying effects without trim: {[effect.__class__.__name__ for effect in local_effects]}"
+            )
+            input_stream = ffmpeg.input(self.file_path)
+            video_node: ffmpeg.nodes.FilterableStream = input_stream.video
+            audio_node = input_stream.audio
+
+            for effect in local_effects:
+                video_node: ffmpeg.nodes.FilterableStream = effect.video_node(
+                    video_node, self.file_path
+                )
+
+            try:
+                audio_codec = StreamUtils.get_audio_codec(self.file_path)
+                acodec = "copy" if audio_codec == "aac" else "aac"
+
+                with tempfile.NamedTemporaryFile(
+                    suffix=".mp4", delete=False
+                ) as temp_file:
+                    (
+                        ffmpeg.output(
+                            video_node,
+                            audio_node,
+                            temp_file.name,
+                            vcodec="libx264",
+                            acodec=acodec,
+                        )
+                        .overwrite_output()
+                        .global_args(
+                            "-hide_banner",
+                            "-loglevel",
+                            "error",  # Suppress ffmpeg output
+                            "-stats",  # Show progress stats
+                        )
+                        .run()
+                    )
+                    os.replace(temp_file.name, self.file_path)
+
+                self.logger.info(f"Effects applied successfully without trim.")
+            except ffmpeg.Error as e:
+                self.logger.error(f"Error applying effects : {e}")
+                self.logger.error(
+                    e.stdout.decode("utf-8") if e.stdout else "No ffmpeg stdout"
+                )
+                self.logger.error(
+                    e.stderr.decode("utf-8") if e.stderr else "No ffmpeg stderr"
+                )
+                raise
+
+        apply_without_trim(effects[:trim_idx])
+        if trim_idx < len(effects):
+            self.logger.info("Found a trim effect, applying it.")
+            self.apply_effects_individual([effects[trim_idx]])
+        else:
+            self.logger.info("No trim effect to apply.")
+        apply_without_trim(effects[trim_idx + 1 :])
+
+        self.logger.info("Effects applied successfully.")
 
     def effects_vid(
         self,
@@ -71,6 +152,7 @@ class EditorEffects:
                     font_size=50,
                     color="white",
                     duration=self.duration,
+                    offset=(0, 20),  # Offset for top margin
                 )
             ]
         )
@@ -106,13 +188,14 @@ class EditorEffects:
             subtitle_prop = TextOverlayProperties(
                 text=text,
                 position=TextPosition(
-                    vertical="bottom",
+                    vertical="center",
                     horizontal="center",
                 ),
                 font_size=24,
                 color="white",
                 start_time=start_time,
                 duration=int(end_time - start_time),
+                offset=(0, 20),
             )
             subtitle_props.append(subtitle_prop)
 
