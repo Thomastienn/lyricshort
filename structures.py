@@ -34,6 +34,13 @@ class Effect(BaseModel, ABC):
     A base class for all effects.
     """
 
+    GLOBAL_ARGS = [
+        "-hide_banner",
+        "-loglevel",
+        "error",  # Suppress ffmpeg output
+        "-stats",  # Show progress stats
+    ]
+
     @abstractmethod
     def apply(self, file_path: str):
         """
@@ -89,10 +96,7 @@ class BlurEffect(Effect):
                 )
                 .overwrite_output()
                 .global_args(
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",  # Suppress ffmpeg output
-                    "-stats",  # Show progress stats
+                    *self.GLOBAL_ARGS  # Use global arguments for ffmpeg
                 )
                 .run()
             )
@@ -206,10 +210,7 @@ class TextOverlayEffect(Effect):
                 )
                 .overwrite_output()
                 .global_args(
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",  # Suppress ffmpeg output
-                    "-stats",  # Show progress stats
+                    *self.GLOBAL_ARGS  # Use global arguments for ffmpeg
                 )
                 .run()
             )
@@ -244,10 +245,7 @@ class TrimEffect(Effect):
                 .output(temp_file.name, vcodec="copy", acodec=acodec)
                 .overwrite_output()
                 .global_args(
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",  # Suppress ffmpeg output
-                    "-stats",  # Show progress stats
+                    *self.GLOBAL_ARGS  # Use global arguments for ffmpeg
                 )
                 .run()
             )
@@ -310,10 +308,7 @@ class FillOverlayEffect(Effect):
                 )
                 .overwrite_output()
                 .global_args(
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",  # Suppress ffmpeg output
-                    "-stats",  # Show progress stats
+                    *self.GLOBAL_ARGS  # Use global arguments for ffmpeg
                 )
                 .run()
             )

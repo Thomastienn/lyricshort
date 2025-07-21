@@ -3,3 +3,4 @@ pydantic
 ffmpeg-python
 sentence-transformers
 srt
+python-dotenv

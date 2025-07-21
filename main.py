@@ -3,16 +3,19 @@ import sys
 import shutil
 
 import yt_dlp
+from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer, util
 
 from logger import MyLogger
 from structures import UserPrompts
 from effects import EditorEffects
 
+load_dotenv()
+
 my_prompt = UserPrompts(
-    title="Lost",
-    author="Obito",
-    language="vi",
+    title=os.getenv("TITLE", "Never gonna give you up"),
+    author=os.getenv("AUTHOR", "Rick Astley"),
+    language=os.getenv("LANGUAGE", "en"),
 )
 
 sys.stderr = open("error.log", "w")
