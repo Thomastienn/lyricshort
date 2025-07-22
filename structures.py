@@ -7,7 +7,8 @@ from typing import Literal
 import ffmpeg
 from pydantic import BaseModel
 
-from utils import StreamUtils
+from utils import StreamUtils, FontUtils
+from logger import MyLogger
 
 
 class UserPrompts(BaseModel):
@@ -34,12 +35,20 @@ class Effect(BaseModel, ABC):
     A base class for all effects.
     """
 
-    GLOBAL_ARGS = [
+    GLOBAL_ARGS: list[str] = [
         "-hide_banner",
         "-loglevel",
         "error",  # Suppress ffmpeg output
         "-stats",  # Show progress stats
     ]
+
+    def __init_subclass__(cls):
+        """
+        Automatically log the application of the effect when a subclass is created.
+        """
+        super().__init_subclass__()
+        original_apply = cls.apply
+        setattr(cls, "apply", MyLogger.log_apply(original_apply))
 
     @abstractmethod
     def apply(self, file_path: str):
@@ -132,6 +141,8 @@ class TextOverlayEffect(Effect):
 
     texts: list[TextOverlayProperties]
 
+    _temp_files: list[str] = []  # List to keep track of temporary files created
+
     def video_node(
         self, input_stream_video: ffmpeg.nodes.FilterableStream, *args, **kwargs
     ):
@@ -146,7 +157,7 @@ class TextOverlayEffect(Effect):
                 start_time = text_props.start_time
 
             width, height = StreamUtils.get_video_dimensions(file_path)
-            font_width, font_height = StreamUtils.get_font_dimensions(
+            font_width, font_height = FontUtils.get_font_dimensions(
                 text_props.font_size, text_props.text
             )
 
