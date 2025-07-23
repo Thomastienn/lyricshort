@@ -157,7 +157,7 @@ with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 subtitle_path=subtitle_file,
                 metadata=metadata,
             )
-            logger.info(f"Using font: {FontUtils.CURRENT_FONT}")
+            logger.info(f"Using font: {FontUtils.get_current_font()}")
             editor.effects_vid(user_prompts=my_prompt)
             editor.add_subtitles()
 

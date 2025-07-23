@@ -2,7 +2,7 @@ import os
 import tempfile
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import Literal, ClassVar
 
 import ffmpeg
 from pydantic import BaseModel
@@ -35,7 +35,7 @@ class Effect(BaseModel, ABC):
     A base class for all effects.
     """
 
-    GLOBAL_ARGS: list[str] = [
+    GLOBAL_ARGS: ClassVar[list[str]] = [
         "-hide_banner",
         "-loglevel",
         "error",  # Suppress ffmpeg output
@@ -183,6 +183,10 @@ class TextOverlayEffect(Effect):
             x += text_props.offset[0]  # Move right
             y += text_props.offset[1]  # Move down
 
+            extra_args = {}
+            if FontUtils._CURRENT_FONT is not None:
+                extra_args["fontfile"] = FontUtils._CURRENT_FONT
+
             video_node = video_node.filter(  # type: ignore[reportAttributeAccessIssue]
                 "drawtext",
                 text=text_props.text,
@@ -193,6 +197,7 @@ class TextOverlayEffect(Effect):
                 box=1,
                 boxcolor=text_props.background_color,
                 enable=f"between(t,{start_time},{start_time + text_props.duration})",
+                **extra_args,
             )
 
         return video_node

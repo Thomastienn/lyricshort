@@ -65,53 +65,56 @@ class FontUtils:
     Utility class for common operations related to fonts.
     """
 
+    _CURRENT_FONT: str | None = None
+
     @staticmethod
-    def find_system_fonts():
-        font_dirs = []
-        system = platform.system()
-        if system == "Windows":
-            font_dirs.append(os.path.join(os.environ["WINDIR"], "Fonts"))
-        elif system == "Darwin":  # macOS
-            font_dirs += [
-                "/System/Library/Fonts",
-                "/Library/Fonts",
-                os.path.expanduser("~/Library/Fonts"),
-            ]
-        elif system == "Linux":
-            font_dirs += [
-                "/usr/share/fonts",
-                "/usr/local/share/fonts",
-                os.path.expanduser("~/.fonts"),
-                os.path.expanduser("~/.local/share/fonts"),
-            ]
-        else:
-            raise NotImplementedError(f"Unsupported OS: {system}")
-        font_files = []
-        for font_dir in font_dirs:
-            if os.path.exists(font_dir):
-                # Search for TTF, OTF, and TTC font files
-                font_files += glob.glob(
-                    os.path.join(font_dir, "**", "*.[ot]tf"), recursive=True
-                )
-                font_files += glob.glob(
-                    os.path.join(font_dir, "**", "*.ttc"), recursive=True
-                )
-        return font_files
+    def find_all_fonts():
+        """
+        Get all the fonts in the fonts/ directory.
+        """
+        fonts_dir = "fonts/static"
+        if not os.path.exists(fonts_dir):
+            raise FileNotFoundError(f"Fonts directory '{fonts_dir}' does not exist.")
+
+        # Use glob to find all font files in the directory
+        font_files = glob.glob(os.path.join(fonts_dir, "*.*"))
+        # Filter out non-font files based on common font extensions
+        font_extensions = {".ttf", ".otf", ".woff", ".woff2", ".ttc"}
+        return [
+            f for f in font_files if os.path.splitext(f)[1].lower() in font_extensions
+        ]
 
     # Basename: path (e.g., "Arial.ttf") -> full path (e.g., "/usr/share/fonts/Arial.ttf")
-    FONTS_AVAILABLE: dict[str, str] = {
-        os.path.basename(font): font for font in find_system_fonts()
-    }
-    # CURRENT_FONT: str = random.choice(list(FONTS_AVAILABLE.values()))
-    CURRENT_FONT: str | None = None
+    @staticmethod
+    def all_fonts() -> dict[str, str]:
+        """
+        Get all the fonts in the fonts/ directory.
+        Returns a dictionary where keys are font names and values are full paths.
+        """
+        return {os.path.basename(font): font for font in FontUtils.find_all_fonts()}
 
     @staticmethod
-    def get_font_dimensions(font_size, text, font_path=CURRENT_FONT):
+    def get_current_font() -> str:
+        """
+        Get a random font from the available fonts.
+        """
+        if FontUtils._CURRENT_FONT is not None:
+            return FontUtils._CURRENT_FONT
+
+        selected_font = random.choice(list(FontUtils.all_fonts().values()))
+        FontUtils._CURRENT_FONT = selected_font
+
+        return selected_font
+
+    # CURRENT_FONT: str = random.choice(list(FONTS_AVAILABLE.values()))
+
+    @staticmethod
+    def get_font_dimensions(font_size, text, font_path=None):
         """
         Get the dimensions of the text when rendered with the specified font and size.
         """
         if font_path is None:
-            font = ImageFont.load_default(font_size)
+            font = ImageFont.truetype(FontUtils.get_current_font(), font_size)
         else:
             font = ImageFont.truetype(font_path, font_size)
 

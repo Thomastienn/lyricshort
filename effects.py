@@ -1,5 +1,4 @@
 import os
-import logging
 import tempfile
 from typing import Sequence
 
@@ -93,12 +92,7 @@ class EditorEffects:
                         acodec=acodec,
                     )
                     .overwrite_output()
-                    .global_args(
-                        "-hide_banner",
-                        "-loglevel",
-                        "error",  # Suppress ffmpeg output
-                        "-stats",  # Show progress stats
-                    )
+                    .global_args(*Effect.GLOBAL_ARGS)
                     .run()
                 )
                 os.replace(temp_file.name, self.file_path)
@@ -184,7 +178,7 @@ class EditorEffects:
                     vertical="center",
                     horizontal="center",
                 ),
-                font_size=24,
+                font_size=40,
                 color="white",
                 start_time=start_time,
                 duration=int(end_time - start_time),
