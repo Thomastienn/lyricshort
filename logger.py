@@ -20,7 +20,7 @@ class MyLogger:
             )
         )
         file_handler = logging.FileHandler(
-            "output.log", mode=("w" if name == "main" else "a")
+            "output.log", mode=("w" if name == "main" else "a"), encoding="utf-8"
         )
         file_handler.setFormatter(
             logging.Formatter(

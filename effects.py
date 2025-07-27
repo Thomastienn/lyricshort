@@ -7,7 +7,7 @@ import ffmpeg
 import srt
 
 from logger import MyLogger
-from utils import StreamUtils
+from utils import StreamUtils, FontUtils
 from structures import (
     Effect,
     TrimEffect,
@@ -124,25 +124,25 @@ class EditorEffects:
         trim = TrimEffect(
             start_time=self.start_time, end_time=self.start_time + self.duration
         )
-        fill_overlay = FillOverlayEffect(color="black", opacity=0.4)
-        text_overlay = TextOverlayEffect(
-            texts=[
-                TextOverlayProperties(
-                    text=f"{user_prompts.title} by {user_prompts.author}",
-                    position=TextPosition(
-                        vertical="top",
-                        horizontal="center",
-                    ),
-                    font_size=50,
-                    color="white",
-                    duration=math.ceil(self.duration),
-                    offset=(0, 20),  # Offset for top margin
-                )
-            ]
-        )
+        fill_overlay = FillOverlayEffect(color="black", opacity=0.6)
+        # text_overlay = TextOverlayEffect(
+        #     texts=[
+        #         TextOverlayProperties(
+        #             text=f"{user_prompts.title} by {user_prompts.author}",
+        #             position=TextPosition(
+        #                 vertical="top",
+        #                 horizontal="center",
+        #             ),
+        #             font_size=50,
+        #             color="white",
+        #             duration=math.ceil(self.duration),
+        #             offset=(0, 20),  # Offset for top margin
+        #         )
+        #     ]
+        # )
 
         try:
-            self.apply_effects([trim, fill_overlay, text_overlay])
+            self.apply_effects([trim, fill_overlay])
             self.logger.info(f"Applied all effects to {self.file_path}")
         except ffmpeg.Error as e:
             self.logger.error(f"Error applying effects: {e}")
@@ -152,6 +152,10 @@ class EditorEffects:
         """
         Add subtitles to the video.
         """
+        FONT_SIZE = 30
+        INIT_OFFSET = 20
+        LINE_GAP = 5
+
         if not os.path.exists(self.subtitle_path):
             self.logger.error(f"Subtitle file {self.subtitle_path} does not exist.")
             return
@@ -160,6 +164,9 @@ class EditorEffects:
             subtitles = srt.parse(file.read())
 
         subtitle_props: list[TextOverlayProperties] = []
+        overlay_spots: dict[int, float] = {}
+        _, font_height = FontUtils.get_font_dimensions(FONT_SIZE, "PLACEHOLDER")
+
         for subtitle in subtitles:
             text: str = subtitle.content
             start_time: float = subtitle.start.total_seconds() - self.start_time
@@ -176,6 +183,17 @@ class EditorEffects:
                 )
                 break
 
+            current_offset = INIT_OFFSET
+            while True:
+                if current_offset in overlay_spots:
+                    end_last = overlay_spots[current_offset]
+                    if start_time >= end_last:
+                        break
+                else:
+                    break
+                current_offset += FONT_SIZE
+
+            overlay_spots[current_offset] = end_time
             self.logger.info(
                 f"Adding subtitle: {subtitle.index}, '{text}' from {start_time} to {end_time}"
             )
@@ -186,11 +204,15 @@ class EditorEffects:
                     vertical="center",
                     horizontal="center",
                 ),
-                font_size=40,
+                font_size=FONT_SIZE,
                 color="white",
                 start_time=start_time,
                 duration=int(end_time - start_time),
-                offset=(0, 20),
+                offset=(
+                    0,
+                    current_offset
+                    + (current_offset - INIT_OFFSET) // FONT_SIZE * LINE_GAP,
+                ),
             )
             subtitle_props.append(subtitle_prop)
 

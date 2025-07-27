@@ -7,6 +7,7 @@ from google.genai import types
 from dotenv import load_dotenv
 
 from structures import Chorus
+from logger import MyLogger
 
 load_dotenv()
 
@@ -16,6 +17,7 @@ class SoundAnalyzer:
         self.path = path
         if not path.endswith(".wav"):
             self.path = StreamUtils.convert_to_wav(path)
+        self.logger = MyLogger.get_logger("SoundAnalyzer")
 
     def _get_features(self):
         y, sr = sf.read(self.path, always_2d=False)
@@ -65,9 +67,15 @@ class SoundAnalyzer:
         This method should analyze the features and return the most likely chorus segment.
         """
         client = genai.Client()
+
+        self.logger.info("Extracting audio features...")
         features = self._get_features()
+        self.logger.info("Audio features extracted successfully.")
+
         with open(lyrics_path, "r", encoding="utf-8") as f:
             lyrics = f.read()
+        self.logger.info("Lyrics loaded successfully.")
+        self.logger.info("Sending request to LLM for best part detection...")
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
@@ -83,6 +91,7 @@ class SoundAnalyzer:
                 response_schema=Chorus,
             ),
         )
+        self.logger.info("LLM response received.")
         llm_response = response.parsed
         assert isinstance(llm_response, Chorus), "LLM response is not of type Chorus"
 

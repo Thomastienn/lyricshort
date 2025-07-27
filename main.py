@@ -45,7 +45,7 @@ download_opts = {
         ),
         "Referer": "https://www.youtube.com/",
     },
-    "outtmpl": "downloads/%(title)s.%(ext)s",
+    "outtmpl": "downloads/%(title)s/%(title)s.%(ext)s",
     "geo_bypass": True,
     "logger": logger,
     "subtitleslangs": [my_prompt.language],
@@ -101,7 +101,7 @@ with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 cos_sim.item():.4f}"
         )
 
-        weird_metric = cos_sim.item() * 0.7 + normalized_view_count * 0.3
+        weird_metric = cos_sim.item() * 0.8 + normalized_view_count * 0.2
         if weird_metric > max_metric:
             max_metric = weird_metric
             max_entry = entry
