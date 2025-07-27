@@ -1,6 +1,7 @@
 import os
 import tempfile
 from typing import Sequence
+import math
 
 import ffmpeg
 import srt
@@ -19,13 +20,20 @@ from structures import (
 
 
 class EditorEffects:
-    def __init__(self, file_path: str, subtitle_path: str, metadata=None):
+    def __init__(
+        self,
+        file_path: str,
+        subtitle_path: str,
+        start_time: float = 25,
+        duration: float = 20,
+        metadata=None,
+    ):
         self.file_path = file_path
         self.subtitle_path = subtitle_path
         self.logger = MyLogger.get_logger("EditorEffects")
         self.metadata = metadata
-        self.start_time = 25
-        self.duration = 20
+        self.start_time = start_time
+        self.duration = duration
 
     def apply_effects_individual(self, effects: Sequence[Effect]):
         """
@@ -127,7 +135,7 @@ class EditorEffects:
                     ),
                     font_size=50,
                     color="white",
-                    duration=self.duration,
+                    duration=math.ceil(self.duration),
                     offset=(0, 20),  # Offset for top margin
                 )
             ]

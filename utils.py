@@ -14,6 +14,21 @@ class StreamUtils:
     """
 
     @staticmethod
+    def convert_to_wav(file_path):
+        """
+        Convert a video file to WAV format.
+        Returns the path to the converted WAV file.
+        """
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File '{file_path}' does not exist.")
+
+        output_file = os.path.splitext(file_path)[0] + ".wav"
+        ffmpeg.input(file_path).output(output_file, format="wav").run(
+            overwrite_output=True, quiet=True
+        )
+        return output_file
+
+    @staticmethod
     def get_video_dimensions(file_path):
         """
         Get the dimensions of a video file.

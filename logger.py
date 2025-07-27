@@ -19,7 +19,9 @@ class MyLogger:
                 "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
             )
         )
-        file_handler = logging.FileHandler("output.log", mode="w")
+        file_handler = logging.FileHandler(
+            "output.log", mode=("w" if name == "main" else "a")
+        )
         file_handler.setFormatter(
             logging.Formatter(
                 "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"

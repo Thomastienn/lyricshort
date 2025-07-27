@@ -11,6 +11,31 @@ from utils import StreamUtils, FontUtils
 from logger import MyLogger
 
 
+class Segment(BaseModel):
+    """
+    Represents a segment of a video.
+    """
+
+    start_time: float  # Start time in seconds
+    end_time: float  # End time in seconds
+
+
+class Verse(Segment):
+    """
+    Represents a verse in a video.
+    """
+
+    ...
+
+
+class Chorus(Segment):
+    """
+    Represents a chorus in a video.
+    """
+
+    ...
+
+
 class UserPrompts(BaseModel):
     """
     Represents user prompts for video editing.

@@ -10,6 +10,7 @@ from logger import MyLogger
 from structures import UserPrompts
 from effects import EditorEffects
 from utils import FontUtils
+from analyzer import SoundAnalyzer
 
 load_dotenv()
 
@@ -149,6 +150,14 @@ with yt_dlp.YoutubeDL(ydl_opts) as ydl:
 
             logger.info(f"Downloaded to {file_name}")
 
+            sound_analyzer = SoundAnalyzer(path=file_name)
+            start_chorus, end_chorus = sound_analyzer.pick_chorus(
+                lyrics_path=subtitle_file
+            )
+            logger.info(
+                f"Chorus segment found from {start_chorus:.2f} to {end_chorus:.2f} seconds."
+            )
+
             edited_filename = os.path.splitext(file_name)[0] + "_edited.mp4"
             shutil.copy(file_name, edited_filename)
 
@@ -156,6 +165,8 @@ with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 file_path=edited_filename,
                 subtitle_path=subtitle_file,
                 metadata=metadata,
+                start_time=start_chorus,
+                duration=end_chorus - start_chorus,
             )
             logger.info(f"Using font: {FontUtils.get_current_font()}")
             editor.effects_vid(user_prompts=my_prompt)

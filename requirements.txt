@@ -4,3 +4,4 @@ ffmpeg-python
 sentence-transformers
 srt
 python-dotenv
+google-genai
