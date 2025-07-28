@@ -85,7 +85,7 @@ class FontUtils:
     @staticmethod
     def find_all_fonts():
         """
-        Get all the fonts in the fonts/ directory.
+        Get all the fonts in the fonts/static directory.
         """
         fonts_dir = "fonts/static"
         if not os.path.exists(fonts_dir):
@@ -116,7 +116,15 @@ class FontUtils:
         if FontUtils._CURRENT_FONT is not None:
             return FontUtils._CURRENT_FONT
 
-        selected_font = random.choice(list(FontUtils.all_fonts().values()))
+        # selected_font = random.choice(list(FontUtils.all_fonts().values()))
+        selected_font = None
+        for font in FontUtils.all_fonts().values():
+            base_name = os.path.basename(font)
+            if base_name.lower().startswith("noto"):
+                selected_font = font
+                break
+        if selected_font is None:
+            selected_font = random.choice(list(FontUtils.all_fonts().values()))
         FontUtils._CURRENT_FONT = selected_font
 
         return selected_font
@@ -137,3 +145,7 @@ class FontUtils:
         width = bbox[2] - bbox[0]
         height = bbox[3] - bbox[1]
         return width, height
+
+
+if __name__ == "__main__":
+    print(FontUtils.get_current_font())

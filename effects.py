@@ -152,7 +152,7 @@ class EditorEffects:
         """
         Add subtitles to the video.
         """
-        FONT_SIZE = 30
+        FONT_SIZE = 35
         INIT_OFFSET = 20
         LINE_GAP = 5
 
@@ -168,7 +168,7 @@ class EditorEffects:
         _, font_height = FontUtils.get_font_dimensions(FONT_SIZE, "PLACEHOLDER")
 
         for subtitle in subtitles:
-            text: str = subtitle.content
+            text: str = subtitle.content.replace("\n", " ").strip()
             start_time: float = subtitle.start.total_seconds() - self.start_time
             end_time: float = subtitle.end.total_seconds() - self.start_time
 
